@@ -1,0 +1,285 @@
+/* ---------- Base / Theme ---------- */
+:root{
+  --bg: #e9f1fe;           /* light blue */
+  --card: #ffffff;         /* white cards */
+  --text: #1f2937;         /* slate-800 */
+  --muted: #6b7280;        /* slate-500 */
+  --brand: #4f7cff;        /* primary */
+  --brand-d: #315ee7;      /* primary darker */
+  --danger: #e11d48;       /* red-600 */
+  --shadow: 0 10px 28px rgba(16,24,40,.12);
+  --radius: 16px;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", "Segoe UI", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ---------- Layout wrappers ---------- */
+.meetRoot{
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.meetingHeader{
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 18px 16px 8px;
+}
+
+.meetingId{
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* ---------- Lobby ---------- */
+.lobby{
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px 48px;
+}
+
+.lobbyCard{
+  width: 100%;
+  max-width: 560px;
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.lobbyTitle{
+  margin: 4px 0 14px;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.previewWrapper{
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.previewVideo{
+  width: 100%;
+  max-width: 520px;
+  height: 300px;
+  border-radius: 12px;
+  background: #000;
+  object-fit: cover;
+  box-shadow: 0 6px 18px rgba(0,0,0,.25);
+}
+
+/* Username + Connect (below the video) */
+.nameConnect{
+  margin-top: 14px;
+  width: 100%;
+  display: flex;
+  gap: 10px;
+}
+
+.usernameInput{
+  flex: 1;
+  background: transparent;
+}
+
+/* tune MUI textfield outline */
+.usernameInput .MuiOutlinedInput-root{
+  border-radius: 10px;
+}
+.usernameInput .MuiOutlinedInput-notchedOutline{
+  border-color: #cdd8ff;
+}
+.usernameInput .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline{
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(79,124,255,.18);
+}
+
+.connectBtn{
+  background: var(--brand) !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  padding: 10px 18px !important;
+  border-radius: 10px !important;
+  text-transform: none !important;
+}
+.connectBtn:hover{
+  background: var(--brand-d) !important;
+}
+
+/* ---------- In-call view ---------- */
+.meetVideoContainer{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 18px 16px 48px;
+  gap: 14px;
+}
+
+/* Control bar */
+.btn-container{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #0f172a; /* dark slate */
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+.ctrlBtn{
+  color: #ffffff !important;
+}
+
+.endBtn{
+  color: var(--danger) !important;
+  background: rgba(225,29,72,.08) !important;
+  border-radius: 12px !important;
+}
+
+/* Local self view (smaller) */
+.meetUserVideo{
+  width: min(95vw, 360px);
+  height: 220px;
+  border-radius: 14px;
+  object-fit: cover;
+  background: #000;
+  box-shadow: 0 8px 20px rgba(0,0,0,.18);
+}
+
+/* Remote grid */
+.conferencingView{
+  width: 100%;
+  max-width: 1200px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill,minmax(280px,1fr));
+  gap: 14px;
+}
+
+.remoteTile video{
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  background: #000;
+  border-radius: 14px;
+  box-shadow: 0 8px 18px rgba(0,0,0,.15);
+}
+
+/* ---------- Chat ---------- */
+.chatRoom{
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  width: 320px;
+  height: 460px;
+  background: var(--card);
+  border-radius: 18px;
+  box-shadow: 0 18px 32px rgba(0,0,0,.28);
+  overflow: hidden;
+  z-index: 1000;
+}
+
+.chatContainer{
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.chatHeader{
+  margin: 0;
+  padding: 12px 16px;
+  color: #fff;
+  background: var(--brand);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.chatMessages{
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+  background: #f7f8ff;
+}
+.chatMessages::-webkit-scrollbar{ width: 8px; }
+.chatMessages::-webkit-scrollbar-thumb{
+  background: #cbd5e1;
+  border-radius: 6px;
+}
+
+.chatMessage{
+  padding: 8px 10px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  max-width: 85%;
+  word-wrap: break-word;
+  font-size: 14px;
+}
+.chatMessage.self{
+  background: #dbe7ff;
+  margin-left: auto;
+}
+.chatMessage.other{
+  background: #ececec;
+  margin-right: auto;
+}
+
+.chatInput{
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+.chatTextField .MuiOutlinedInput-root{
+  border-radius: 10px;
+}
+.chatSendBtn{
+  text-transform: none !important;
+  font-weight: 700 !important;
+}
+
+/* ---------- Responsive tweaks ---------- */
+@media (max-width: 540px){
+  .nameConnect{ flex-direction: column; }
+  .connectBtn{ width: 100% !important; }
+  .chatRoom{
+    width: calc(100% - 24px);
+    right: 12px; left: 12px;
+  }
+}
+
+.lobbyToggleBtns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lobbyToggleBtns .ctrlBtn {
+  background: #0f172a;
+  color: #fff !important;
+  width: 42px;
+  height: 42px;
+  border-radius: 50% !important;
+  box-shadow: var(--shadow);
+}
+
+.lobbyToggleBtns .ctrlBtn:hover {
+  background: #1e293b;
+}
