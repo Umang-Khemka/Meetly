@@ -43,11 +43,20 @@ export default function VideoMeet() {
   const [askForUsername, setAskForUsername] = useState(true);
   const [username, setUsername] = useState("");
   const [videos, setVideos] = useState([]);
+  const [connectionStates, setConnectionStates] = useState({});
 
   // Helper functions
   const createPeerConnection = (socketId) => {
     const pc = new RTCPeerConnection(peerConfigConnections);
     connection[socketId] = pc;
+
+    // Add connection state monitoring
+    pc.onconnectionstatechange = () => {
+      setConnectionStates(prev => ({
+        ...prev,
+        [socketId]: pc.connectionState
+      }));
+    };
 
     if (window.localStream) {
       window.localStream.getTracks().forEach((track) => {
@@ -59,7 +68,8 @@ export default function VideoMeet() {
       const stream = event.streams[0];
       if (stream) {
         setVideos((prev) => {
-          if (prev.find((v) => v.socketId === socketId)) {
+          const existingVideo = prev.find((v) => v.socketId === socketId);
+          if (existingVideo) {
             return prev.map((v) =>
               v.socketId === socketId ? { ...v, stream } : v
             );
@@ -340,6 +350,45 @@ export default function VideoMeet() {
     setMessages((prev) => [...prev, msg]);
   };
 
+  const cleanupUserConnection = (userId) => {
+    // 1. Clean up the video element reference first
+    if (remoteVideoRefs.current[userId]) {
+      const videoElement = remoteVideoRefs.current[userId];
+      if (videoElement && videoElement.srcObject) {
+        // Stop all tracks in the stream
+        const stream = videoElement.srcObject;
+        if (stream && stream.getTracks) {
+          stream.getTracks().forEach(track => {
+            track.stop();
+          });
+        }
+        // Clear the srcObject
+        videoElement.srcObject = null;
+      }
+      // Remove from refs
+      delete remoteVideoRefs.current[userId];
+    }
+
+    // 2. Close and clean up peer connection
+    if (connection[userId]) {
+      try {
+        // Close the peer connection
+        connection[userId].close();
+        // Remove from connections object
+        delete connection[userId];
+      } catch (error) {
+        console.error(`Error closing connection for user ${userId}:`, error);
+      }
+    }
+
+    // 3. Remove from connection states
+    setConnectionStates(prev => {
+      const newStates = { ...prev };
+      delete newStates[userId];
+      return newStates;
+    });
+  };
+
   let connectToSocketServer = () => {
     socketRef.current = io(server_url, {
       transports: ["websocket"],
@@ -354,21 +403,19 @@ export default function VideoMeet() {
 
       socketRef.current.on("chat-message", addMessage);
 
-      socketRef.current.on("user-left", (id) => {
-        setVideos((prev) => prev.filter((video) => video.socketId !== id));
+      // IMPROVED USER-LEFT LOGIC
+      socketRef.current.on("user-left", (userId) => {
+        // 1. First, remove from videos state to trigger immediate re-render
+        setVideos((prev) => {
+          const filteredVideos = prev.filter((video) => video.socketId !== userId);
+          return filteredVideos;
+        });
 
-        if (connection[id]) {
-          connection[id].close();
-          delete connection[id];
-        }
-
-        if (remoteVideoRefs.current[id]) {
-          remoteVideoRefs.current[id].srcObject = null;
-          delete remoteVideoRefs.current[id];
-        }
+        // 2. Clean up all connections and references
+        cleanupUserConnection(userId);
       });
 
-      socketRef.current.on("user-joined", (id, clients) => {
+      socketRef.current.on("user-joined", (joinedId, clients) => {
         clients.forEach((socketListId) => {
           if (socketListId === socketIdRef.current) return;
 
@@ -377,7 +424,7 @@ export default function VideoMeet() {
           }
         });
 
-        if (id === socketIdRef.current) {
+        if (joinedId === socketIdRef.current) {
           clients.forEach((socketListId) => {
             if (socketListId === socketIdRef.current) return;
 
@@ -399,6 +446,15 @@ export default function VideoMeet() {
           });
         }
       });
+    });
+
+    // Handle disconnect
+    socketRef.current.on("disconnect", () => {
+      // Clean up all connections
+      Object.keys(connection).forEach(userId => {
+        cleanupUserConnection(userId);
+      });
+      setVideos([]);
     });
   };
 
@@ -543,6 +599,17 @@ export default function VideoMeet() {
       let tracks = localVideoRef.current.srcObject.getTracks();
       tracks.forEach(track => track.stop());
     } catch(e) {}
+    
+    // Clean up all connections before leaving
+    Object.keys(connection).forEach(userId => {
+      cleanupUserConnection(userId);
+    });
+    
+    // Disconnect socket
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+    }
+    
     routeTo("/home");
   };
 
@@ -558,17 +625,54 @@ export default function VideoMeet() {
     }
   };
 
+  // IMPROVED VIDEO REFS MANAGEMENT
   useEffect(() => {
     videos.forEach((video) => {
-      if (
-        remoteVideoRefs.current[video.socketId] &&
-        video.stream &&
-        remoteVideoRefs.current[video.socketId].srcObject !== video.stream
-      ) {
-        remoteVideoRefs.current[video.socketId].srcObject = video.stream;
+      if (video.stream && remoteVideoRefs.current[video.socketId]) {
+        const videoElement = remoteVideoRefs.current[video.socketId];
+        if (videoElement && videoElement.srcObject !== video.stream) {
+          videoElement.srcObject = video.stream;
+        }
+      }
+    });
+
+    // Clean up refs for users no longer in videos array
+    Object.keys(remoteVideoRefs.current).forEach(socketId => {
+      if (!videos.find(v => v.socketId === socketId)) {
+        const videoElement = remoteVideoRefs.current[socketId];
+        if (videoElement) {
+          if (videoElement.srcObject) {
+            const stream = videoElement.srcObject;
+            if (stream && stream.getTracks) {
+              stream.getTracks().forEach(track => track.stop());
+            }
+            videoElement.srcObject = null;
+          }
+        }
+        delete remoteVideoRefs.current[socketId];
       }
     });
   }, [videos]);
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      // Stop local stream
+      if (window.localStream) {
+        window.localStream.getTracks().forEach(track => track.stop());
+      }
+      
+      // Clean up all connections
+      Object.keys(connection).forEach(userId => {
+        cleanupUserConnection(userId);
+      });
+      
+      // Disconnect socket
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
+    };
+  }, []);
 
   return (
     <div className="meetRoot">
@@ -639,6 +743,11 @@ export default function VideoMeet() {
                     placeholder="Type a message..."
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        sendMessages();
+                      }
+                    }}
                     size="small"
                     className="chatTextField"
                   />
@@ -693,17 +802,26 @@ export default function VideoMeet() {
             playsInline
           ></video>
 
-          {/* remote grid */}
+          {/* IMPROVED remote grid with better key management and error handling */}
           <div className="conferencingView">
             {videos.map((video) => (
-              <div className="remoteTile" key={video.socketId}>
+              <div className="remoteTile" key={`remote-${video.socketId}`}>
                 <video
+                  key={video.socketId}
                   ref={(ref) => {
-                    remoteVideoRefs.current[video.socketId] = ref;
+                    if (ref) {
+                      remoteVideoRefs.current[video.socketId] = ref;
+                    }
                   }}
                   autoPlay
                   playsInline
-                ></video>
+                />
+                {/* Optional: Add connection state indicator */}
+                {connectionStates[video.socketId] && connectionStates[video.socketId] !== 'connected' && (
+                  <div className="connectionStatus">
+                    {connectionStates[video.socketId]}
+                  </div>
+                )}
               </div>
             ))}
           </div>
