@@ -29,12 +29,13 @@ export default function VideoMeet() {
   const socketIdRef = useRef();
   const localVideoRef = useRef();
   const remoteVideoRefs = useRef({});
+  const screenStreamRef = useRef(); // Add ref to track screen stream
 
   const [videoAvailable, setVideoAvailable] = useState(true);
   const [audioAvailable, setAudioAvailable] = useState(true);
   const [video, setVideo] = useState([]);
   const [audio, setAudio] = useState();
-  const [screen, setScreen] = useState();
+  const [screen, setScreen] = useState(false); // Initialize to false
   const [showModal, setShowModal] = useState(true);
   const [screenAvailable, setScreenAvailable] = useState();
   const [messages, setMessages] = useState([]);
@@ -44,6 +45,16 @@ export default function VideoMeet() {
   const [username, setUsername] = useState("");
   const [videos, setVideos] = useState([]);
   const [connectionStates, setConnectionStates] = useState({});
+
+  // Helper function to stop all tracks in a stream
+  const stopStreamTracks = (stream) => {
+    if (stream && stream.getTracks) {
+      stream.getTracks().forEach(track => {
+        track.stop();
+        console.log(`Stopped ${track.kind} track:`, track.id);
+      });
+    }
+  };
 
   // Helper functions
   const createPeerConnection = (socketId) => {
@@ -98,11 +109,13 @@ export default function VideoMeet() {
         video: true,
       });
       setVideoAvailable(!!videoPermission);
+      stopStreamTracks(videoPermission); // Stop test stream
 
       const audioPermission = await navigator.mediaDevices.getUserMedia({
         audio: true,
       });
       setAudioAvailable(!!audioPermission);
+      stopStreamTracks(audioPermission); // Stop test stream
 
       if (navigator.mediaDevices.getDisplayMedia) {
         setScreenAvailable(true);
@@ -117,6 +130,11 @@ export default function VideoMeet() {
         });
 
         if (userMediaStream) {
+          // Stop previous stream if exists
+          if (window.localStream) {
+            stopStreamTracks(window.localStream);
+          }
+          
           window.localStream = userMediaStream;
           if (localVideoRef.current) {
             localVideoRef.current.srcObject = userMediaStream;
@@ -134,7 +152,9 @@ export default function VideoMeet() {
 
   let getUserMediaSuccess = (stream) => {
     try {
-      window.localStream.getTracks().forEach((track) => track.stop());
+      if (window.localStream) {
+        stopStreamTracks(window.localStream);
+      }
     } catch (e) {
       console.log(e);
     }
@@ -356,12 +376,7 @@ export default function VideoMeet() {
       const videoElement = remoteVideoRefs.current[userId];
       if (videoElement && videoElement.srcObject) {
         // Stop all tracks in the stream
-        const stream = videoElement.srcObject;
-        if (stream && stream.getTracks) {
-          stream.getTracks().forEach(track => {
-            track.stop();
-          });
-        }
+        stopStreamTracks(videoElement.srcObject);
         // Clear the srcObject
         videoElement.srcObject = null;
       }
@@ -489,12 +504,39 @@ export default function VideoMeet() {
     if (!screen) {
       getDisplayMedia();
     } else {
-      getPermissions();
+      stopScreenSharing();
+    }
+  };
+
+  // FIXED: New function to properly stop screen sharing
+  const stopScreenSharing = async () => {
+    try {
+      // Stop screen sharing stream if it exists
+      if (screenStreamRef.current) {
+        stopStreamTracks(screenStreamRef.current);
+        screenStreamRef.current = null;
+      }
+
+      // Set screen state to false immediately
+      setScreen(false);
+
+      // Get back to camera/audio
+      await getPermissions();
+    } catch (error) {
+      console.error("Error stopping screen share:", error);
       setScreen(false);
     }
   };
 
   let getDisplayMediaSuccess = (stream) => {
+    // Store reference to screen stream
+    screenStreamRef.current = stream;
+    
+    // Stop previous local stream
+    if (window.localStream) {
+      stopStreamTracks(window.localStream);
+    }
+    
     window.localStream = stream;
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = stream;
@@ -536,45 +578,14 @@ export default function VideoMeet() {
         .catch(console.log);
     }
 
-    stream.getVideoTracks()[0].onended = async () => {
-      await getPermissions();
-
-      for (let id in connection) {
-        if (id === socketIdRef.current) continue;
-
-        const senders = connection[id].getSenders();
-        const newStream = window.localStream;
-
-        newStream.getTracks().forEach((newTrack) => {
-          const sender = senders.find(
-            (s) => s.track && s.track.kind === newTrack.kind
-          );
-          if (sender) {
-            sender.replaceTrack(newTrack).catch((e) => {
-              connection[id].removeTrack(sender);
-              connection[id].addTrack(newTrack, newStream);
-            });
-          } else {
-            connection[id].addTrack(newTrack, newStream);
-          }
-        });
-
-        const offer = await connection[id].createOffer();
-        await connection[id].setLocalDescription(offer);
-
-        socketRef.current.emit(
-          "signal",
-          id,
-          JSON.stringify({ sdp: connection[id].localDescription })
-        );
-      }
-
-      setScreen(false);
-
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = window.localStream;
-      }
-    };
+    // FIXED: Handle screen share ending properly
+    const videoTrack = stream.getVideoTracks()[0];
+    if (videoTrack) {
+      videoTrack.onended = async () => {
+        console.log("Screen share ended by user");
+        await stopScreenSharing();
+      };
+    }
   };
 
   let getDisplayMedia = () => {
@@ -582,23 +593,44 @@ export default function VideoMeet() {
       navigator.mediaDevices
         .getDisplayMedia({ video: true, audio: audioAvailable })
         .then(getDisplayMediaSuccess)
-        .catch((e) => console.log(e));
+        .catch((e) => {
+          console.log("Screen share cancelled or failed:", e);
+          setScreen(false);
+        });
     }
   };
 
-  useEffect(() => {
-    if (screen !== undefined) {
-      getDisplayMedia();
-    }
-  });
+  // REMOVED: The problematic useEffect that was causing infinite loops
+  // useEffect(() => {
+  //   if (screen !== undefined) {
+  //     getDisplayMedia();
+  //   }
+  // });
 
   let routeTo = useNavigate();
 
   let handleEndCall = () => {
     try {
-      let tracks = localVideoRef.current.srcObject.getTracks();
-      tracks.forEach(track => track.stop());
-    } catch(e) {}
+      // Stop local video stream
+      if (localVideoRef.current && localVideoRef.current.srcObject) {
+        stopStreamTracks(localVideoRef.current.srcObject);
+        localVideoRef.current.srcObject = null;
+      }
+
+      // Stop window.localStream
+      if (window.localStream) {
+        stopStreamTracks(window.localStream);
+        window.localStream = null;
+      }
+
+      // Stop screen sharing stream specifically
+      if (screenStreamRef.current) {
+        stopStreamTracks(screenStreamRef.current);
+        screenStreamRef.current = null;
+      }
+    } catch(e) {
+      console.error("Error stopping streams:", e);
+    }
     
     // Clean up all connections before leaving
     Object.keys(connection).forEach(userId => {
@@ -609,6 +641,11 @@ export default function VideoMeet() {
     if (socketRef.current) {
       socketRef.current.disconnect();
     }
+    
+    // Reset states
+    setScreen(false);
+    setVideo(false);
+    setAudio(false);
     
     routeTo("/home");
   };
@@ -642,10 +679,7 @@ export default function VideoMeet() {
         const videoElement = remoteVideoRefs.current[socketId];
         if (videoElement) {
           if (videoElement.srcObject) {
-            const stream = videoElement.srcObject;
-            if (stream && stream.getTracks) {
-              stream.getTracks().forEach(track => track.stop());
-            }
+            stopStreamTracks(videoElement.srcObject);
             videoElement.srcObject = null;
           }
         }
@@ -659,7 +693,20 @@ export default function VideoMeet() {
     return () => {
       // Stop local stream
       if (window.localStream) {
-        window.localStream.getTracks().forEach(track => track.stop());
+        stopStreamTracks(window.localStream);
+        window.localStream = null;
+      }
+      
+      // Stop screen stream
+      if (screenStreamRef.current) {
+        stopStreamTracks(screenStreamRef.current);
+        screenStreamRef.current = null;
+      }
+      
+      // Stop local video element
+      if (localVideoRef.current && localVideoRef.current.srcObject) {
+        stopStreamTracks(localVideoRef.current.srcObject);
+        localVideoRef.current.srcObject = null;
       }
       
       // Clean up all connections
@@ -779,7 +826,7 @@ export default function VideoMeet() {
 
             {screenAvailable === true ? (
               <IconButton className="ctrlBtn" onClick={handleScreen}>
-                {screen === true ? <ScreenShare /> : <StopScreenShare />}
+                {screen === true ? <StopScreenShare /> : <ScreenShare />}
               </IconButton>
             ) : null}
 
