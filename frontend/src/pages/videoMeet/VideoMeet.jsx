@@ -13,9 +13,8 @@ import {
 } from "@mui/icons-material";
 import { io } from "socket.io-client";
 import "./videoMeet.css";
-import server from "../../environment.js";
 
-const server_url = server;
+const server_url = import.meta.env.MODE === "development" ? "http://localhost:8000" : "/";
 
 var connection = {};
 const peerConfigConnections = {

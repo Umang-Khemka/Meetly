@@ -8,13 +8,16 @@ import cors from "cors";
 import dotenv from "dotenv";
 import connectToSocket from "./controllers/socketManager.js";
 import userRoutes from "./routes/user.routes.js";
+import path from "path";
+const __dirname = path.resolve();
+
 
 const app = express();
 const server = http.createServer(app);
 const io = connectToSocket(server);
 
 app.use(cors({
-  origin: "https://meetly-client.onrender.com",  // ← Updated to match the error
+  origin: "http://localhost:5173",
   credentials: true
 }));
 app.use(cookieParser());
@@ -24,8 +27,18 @@ app.use(express.urlencoded({limit: "40kb", extended: true}));
 
 app.use("/api/v1/users/",userRoutes);
 
+
+
 const PORT = process.env.PORT || 8000;
 const MONGO_URL = process.env.MONGO_URL;
+
+if (process.env.NODE_ENV === "production") {
+  app.use(express.static(path.join(__dirname, "../frontend/dist")));
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
+  });
+}
+
 
 const start = async () => {
   try {
