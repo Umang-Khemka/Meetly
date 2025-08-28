@@ -14,7 +14,7 @@ const server = http.createServer(app);
 const io = connectToSocket(server);
 
 app.use(cors({
-  origin: "https://meetly-frontend-q14z.onrender.com",
+  origin: "https://meetly-client.onrender.com",  // ← Updated to match the error
   credentials: true
 }));
 app.use(cookieParser());
