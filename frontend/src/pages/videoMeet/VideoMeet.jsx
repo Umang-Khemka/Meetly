@@ -13,8 +13,9 @@ import {
 } from "@mui/icons-material";
 import { io } from "socket.io-client";
 import "./videoMeet.css";
+import server from "../../environment.js";
 
-const server_url = import.meta.env.VITE_APP_BASE_URL;
+const server_url = server;
 
 var connection = {};
 const peerConfigConnections = {
