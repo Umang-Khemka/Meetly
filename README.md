@@ -21,6 +21,9 @@ A full-stack video conferencing platform enabling seamless video, audio, chat, a
 - Real-Time Communication => WebRTC, Socket.IO
 - Authentication => JWT
 
+# Live Demo
+- https://meetly-3.onrender.com
+
 # Installation & Setup
 1. Clone the Repository:
    ```bash
