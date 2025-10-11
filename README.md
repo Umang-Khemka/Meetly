@@ -1,5 +1,13 @@
 # Meetly - Video Conferencing Platform
+<img width="1906" height="904" alt="image" src="https://github.com/user-attachments/assets/7f5fa491-ec17-4858-a073-e7367a7adc54" />
+
+<img width="1820" height="894" alt="image" src="https://github.com/user-attachments/assets/7d6dcc23-f955-49a3-baa6-cecf6f0a16ae" />
+
+<img width="1844" height="884" alt="image" src="https://github.com/user-attachments/assets/69695578-1081-45b7-82b6-529d1fb0bc0b" />
+
+
 A full-stack video conferencing platform enabling seamless video, audio, chat, and screen sharing. Users can start, join, and manage meetings with ease — even as guests, without signing up.
+
 
 # Key Features
 ## ✅ User Authentication & State Management
